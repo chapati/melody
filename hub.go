@@ -5,24 +5,26 @@ import (
 )
 
 type hub struct {
-	sessions   map[*Session]bool
-	broadcast  chan *envelope
-	register   chan *Session
-	unregister chan *Session
-	exit       chan *envelope
-	open       bool
-	rwmutex    *sync.RWMutex
+	sessions    map[*Session]bool
+	broadcast   chan *envelope
+	broadcastex chan *envelopeex
+	register    chan *Session
+	unregister  chan *Session
+	exit        chan *envelope
+	open        bool
+	rwmutex     *sync.RWMutex
 }
 
 func newHub() *hub {
 	return &hub{
-		sessions:   make(map[*Session]bool),
-		broadcast:  make(chan *envelope),
-		register:   make(chan *Session),
-		unregister: make(chan *Session),
-		exit:       make(chan *envelope),
-		open:       true,
-		rwmutex:    &sync.RWMutex{},
+		sessions:    make(map[*Session]bool),
+		broadcast:   make(chan *envelope),
+		broadcastex: make(chan *envelopeex),
+		register:    make(chan *Session),
+		unregister:  make(chan *Session),
+		exit:        make(chan *envelope),
+		open:        true,
+		rwmutex:     &sync.RWMutex{},
 	}
 }
 
@@ -49,6 +51,17 @@ loop:
 					}
 				} else {
 					s.writeMessage(m)
+				}
+			}
+			h.rwmutex.RUnlock()
+		case m := <- h.broadcastex:
+			h.rwmutex.RLock()
+			for s := range h.sessions {
+				if m.msgf != nil {
+					if bytes := m.msgf(s); bytes != nil {
+						msg := &envelope{t: m.t, msg: bytes}
+						s.writeMessage(msg)
+					}
 				}
 			}
 			h.rwmutex.RUnlock()

@@ -52,6 +52,7 @@ type handleErrorFunc func(*Session, error)
 type handleCloseFunc func(*Session, int, string) error
 type handleSessionFunc func(*Session)
 type filterFunc func(*Session) bool
+type msgFunc func(*Session) []byte
 
 // Melody implements a websocket manager.
 type Melody struct {
@@ -210,6 +211,18 @@ func (m *Melody) Broadcast(msg []byte) error {
 
 	message := &envelope{t: websocket.TextMessage, msg: msg}
 	m.hub.broadcast <- message
+
+	return nil
+}
+
+// BroadcastEx broadcasts a text message to all sessions that fn resturns non-nil for
+func (m *Melody) BroadcastEx(fn func(*Session) []byte) error {
+	if m.hub.closed() {
+		return errors.New("melody instance is closed")
+	}
+
+	message := &envelopeex{t: websocket.TextMessage, msgf: fn}
+	m.hub.broadcastex <- message
 
 	return nil
 }
